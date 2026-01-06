@@ -13,25 +13,45 @@ dotenv.config()
 const app = express()
 const PORT = process.env.PORT || 5000
 
-connectDB()
+// 🔥 CORS FIX (ADD THIS BLOCK)
+app.use(
+  cors({
+    origin: [
+      'http://localhost:5173',
+      'https://prescription-platform-frontend-bay.vercel.app',
+      'https://prescription-platform-frontend-36r6dojwe-omkar-narkars-projects.vercel.app',
+    ],
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    credentials: true,
+  })
+)
 
-app.use(cors())
+// Middleware
 app.use(express.json())
 app.use(express.urlencoded({ extended: true }))
 app.use('/uploads', express.static('uploads'))
 
+// DB
+connectDB()
+
+// Routes
 app.use('/api/auth', authRoutes)
 app.use('/api/patients', patientRoutes)
 app.use('/api/consultations', consultationRoutes)
 app.use('/api/prescriptions', prescriptionRoutes)
 
+// Health check
 app.get('/', (req, res) => {
   res.json({ message: 'Prescription Platform API is running' })
 })
 
+// Error handler
 app.use((err, req, res, _next) => {
   console.error(err.stack)
-  res.status(500).json({ message: 'Something went wrong!', error: err.message })
+  res.status(500).json({
+    message: 'Something went wrong!',
+    error: err.message,
+  })
 })
 
 app.listen(PORT, () => {
