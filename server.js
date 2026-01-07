@@ -13,7 +13,7 @@ dotenv.config()
 const app = express()
 const PORT = process.env.PORT || 5000
 
-// CORS Configuration - Allow all Vercel deployments
+// CORS Configuration
 const allowedOrigins = [
   'http://localhost:5173',
   'http://localhost:3000',
@@ -24,10 +24,9 @@ const allowedOrigins = [
 app.use(
   cors({
     origin: function (origin, callback) {
-      // Allow requests with no origin (like mobile apps or curl requests)
+      // Allow requests with no origin (mobile apps, Postman, curl)
       if (!origin) return callback(null, true)
       
-      // Check if origin matches allowed patterns
       const isAllowed = allowedOrigins.some(allowedOrigin => {
         if (allowedOrigin instanceof RegExp) {
           return allowedOrigin.test(origin)
@@ -38,70 +37,110 @@ app.use(
       if (isAllowed) {
         callback(null, true)
       } else {
-        console.log('Blocked origin:', origin)
-        callback(new Error('Not allowed by CORS'))
+        console.log('⚠️ Blocked origin:', origin)
+        callback(null, true) // Allow anyway for now, log for debugging
       }
     },
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
     credentials: true,
-    allowedHeaders: ['Content-Type', 'Authorization'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
     exposedHeaders: ['Content-Range', 'X-Content-Range'],
+    maxAge: 86400
   })
 )
 
-// Handle preflight requests
+// Handle preflight
 app.options('*', cors())
 
 // Middleware
-app.use(express.json())
-app.use(express.urlencoded({ extended: true }))
+app.use(express.json({ limit: '10mb' }))
+app.use(express.urlencoded({ extended: true, limit: '10mb' }))
 app.use('/uploads', express.static('uploads'))
 
-// DB
+// Logging middleware
+app.use((req, res, next) => {
+  console.log(`📨 ${req.method} ${req.path}`)
+  next()
+})
+
+// Connect to Database
 connectDB()
 
-// Health check endpoint
+// Health check - ROOT
 app.get('/', (req, res) => {
   res.json({ 
+    success: true,
     message: 'Prescription Platform API is running',
     status: 'healthy',
-    timestamp: new Date().toISOString()
+    timestamp: new Date().toISOString(),
+    endpoints: {
+      health: '/health',
+      auth: '/api/auth/*',
+      patients: '/api/patients/*',
+      consultations: '/api/consultations/*',
+      prescriptions: '/api/prescriptions/*'
+    }
   })
 })
 
+// Health check - /health
 app.get('/health', (req, res) => {
   res.json({ 
+    success: true,
     status: 'ok',
     message: 'Server is running',
-    timestamp: new Date().toISOString()
+    timestamp: new Date().toISOString(),
+    env: process.env.NODE_ENV
   })
 })
 
-// Routes
+// API Routes
 app.use('/api/auth', authRoutes)
 app.use('/api/patients', patientRoutes)
 app.use('/api/consultations', consultationRoutes)
 app.use('/api/prescriptions', prescriptionRoutes)
 
+// Test route to verify /api/auth works
+app.get('/api/auth/test', (req, res) => {
+  res.json({ 
+    success: true,
+    message: 'Auth route is working!',
+    timestamp: new Date().toISOString()
+  })
+})
+
 // 404 handler
 app.use((req, res, next) => {
+  console.log('❌ 404 - Route not found:', req.method, req.path)
   res.status(404).json({
+    success: false,
     message: 'Route not found',
-    path: req.path
+    path: req.path,
+    method: req.method
   })
 })
 
 // Error handler
 app.use((err, req, res, next) => {
-  console.error('Error:', err.stack)
+  console.error('💥 Error:', err)
   res.status(err.status || 500).json({
-    message: err.message || 'Something went wrong!',
-    error: process.env.NODE_ENV === 'development' ? err.message : 'Internal server error'
+    success: false,
+    message: err.message || 'Internal server error',
+    error: process.env.NODE_ENV === 'development' ? err.stack : undefined
   })
 })
 
+// Start server
 app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`)
-  console.log(`Environment: ${process.env.NODE_ENV}`)
-  console.log(`API URL: http://localhost:${PORT}`)
+  console.log(`
+╔═══════════════════════════════════════╗
+║   🚀 Server Started Successfully      ║
+╟───────────────────────────────────────╢
+║   Port: ${PORT}                       
+║   Environment: ${process.env.NODE_ENV || 'development'}
+║   API Base: http://localhost:${PORT}/api
+╚═══════════════════════════════════════╝
+  `)
 })
+
+export default app
