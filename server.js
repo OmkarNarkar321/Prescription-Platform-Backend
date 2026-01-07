@@ -18,7 +18,6 @@ const allowedOrigins = [
   'http://localhost:5173',
   'http://localhost:3000',
   'https://prescription-platform-frontend-bay.vercel.app',
-  /^https:\/\/prescription-platform-frontend-.*\.vercel\.app$/
 ]
 
 app.use(
@@ -27,30 +26,29 @@ app.use(
       // Allow requests with no origin (mobile apps, Postman, curl)
       if (!origin) return callback(null, true)
       
-      const isAllowed = allowedOrigins.some(allowedOrigin => {
-        if (allowedOrigin instanceof RegExp) {
-          return allowedOrigin.test(origin)
-        }
-        return allowedOrigin === origin
-      })
+      // Check exact match or if it includes vercel.app
+      const isAllowed = allowedOrigins.includes(origin) || 
+                        (origin && origin.includes('vercel.app'))
       
       if (isAllowed) {
         callback(null, true)
       } else {
         console.log('⚠️ Blocked origin:', origin)
-        callback(null, true) // Allow anyway for now, log for debugging
+        callback(null, true) // Allow anyway for debugging
       }
     },
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
     credentials: true,
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
     exposedHeaders: ['Content-Range', 'X-Content-Range'],
-    maxAge: 86400
+    maxAge: 86400,
+    preflightContinue: false,
+    optionsSuccessStatus: 204
   })
 )
 
-// Handle preflight
-app.options('*', cors())
+// ✅ REMOVED: app.options('*', cors()) - This was causing the error!
+// The CORS middleware above already handles OPTIONS requests
 
 // Middleware
 app.use(express.json({ limit: '10mb' }))
@@ -101,10 +99,10 @@ app.use('/api/consultations', consultationRoutes)
 app.use('/api/prescriptions', prescriptionRoutes)
 
 // Test route to verify /api/auth works
-app.get('/api/auth/test', (req, res) => {
+app.get('/api/test', (req, res) => {
   res.json({ 
     success: true,
-    message: 'Auth route is working!',
+    message: 'API routes are working!',
     timestamp: new Date().toISOString()
   })
 })
