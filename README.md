@@ -1,4 +1,4 @@
-> **📘 Backend – Online Prescription Platform**
+**📘 Backend – Online Prescription Platform**
 🩺 Project Overview
 
 This is the backend REST API for the Online Prescription Platform built with Node.js, Express, and MongoDB.
